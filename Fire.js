@@ -1,0 +1,3 @@
+class Fire extends GameObject{
+
+}

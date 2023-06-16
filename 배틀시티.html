@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>배틀시티</title>
+    <style>
+        body {
+            margin: 0px;
+        }
+
+        #wrapper {
+            width: 1040px;
+            height: 780px;
+            background: rgb(182, 182, 182);
+            position: relative;
+            margin: auto;
+        }
+        #stage {
+            width: 900px;
+            height: 780px;
+            background: black;
+            position: absolute;
+            left:0px;
+            top:0px;
+        }
+        #enemyHp {
+            background: rgb(182, 182, 182);
+            width: 100px;
+            height: 500px;
+            position: absolute;
+            position: absolute;
+            left:900px;
+            top:100px;            
+        }
+
+        
+        /*
+        
+        #hpBox {
+            font-weight: bold;
+            text-align: center;
+            background-color: rebeccapurple;
+        }
+
+
+        */
+        #win{
+            position: absolute;
+            top:270px;
+            left: -450px;
+            transform: translateX(100%);
+            font-size: 130px;
+            font-weight: bolder;
+            filter:drop-shadow(2px 2px black);
+            animation: twinkle 0.5s linear 2 ;
+            display: none;            
+        }
+        
+        #gameOver{
+            position: absolute;
+            top:270px;
+            left: -620px;
+            transform: translateX(100%);
+            font-size: 120px;
+            font-weight: bolder;
+            filter:drop-shadow(2px 2px black);
+            animation: twinkle 0.5s linear 2 ;
+            display: none; 
+        }
+        
+        @keyframes twinkle{
+            0%{
+                opacity:0,2;
+            }
+            50%{
+                opacity:1;
+            }
+            100%{
+                opacity: 0.2;
+            }
+        }
+    </style>
+
+    <script src="../js/lib.js"></script>
+    <script src="./GameObject.js"></script>
+    <script src="./Map.js"></script>
+    <script src="./Mario.js"></script>
+    <script src="./Enemy.js"></script>
+    <script src="./Bullet.js"></script>
+    <script src="./EnemyBullet.js"></script>
+    <script src="./Sensor.js"></script>
+    <script src="./Brick.js"></script>
+    <script src="./Brick2.js"></script>
+    <script src="./Grass.js"></script>
+    <script src="./Me.js"></script>
+    <script src="./Stone.js"></script>
+    <script src="./Fire.js"></script>
+    <script src="./Pause.js"></script>
+    <script>
+        let hpBox;
+        let stage;
+        let enemyHp;        
+        let fire;
+        let brick;
+        let enemy;
+        let me;
+        let mario;
+        let end;
+
+        let flag = true;
+        let flagX = true;
+        let flagY = true;
+        let level = 0;
+        let score = 3;
+        let direct = 0;
+
+        /*-------------------------------------------------------------
+        각 Stage에서 어떤 맵을, 몇마리의 적군을 등장시킬지를 결정하기 위한 json 정보
+
+         - json 변수의 구성 
+           map : 사용할 맵배열
+           enemycount: 등장시킬 적군 수
+        -------------------------------------------------------------*/
+        let mapArray = [
+            {
+                "map":map1, 
+                "enemycount":16
+            }, 
+            {
+                "map":map2, 
+                "enemycount":32
+            }, 
+        ];
+
+        let enemyCreateCount=mapArray[level].enemycount;
+
+        let hpArray = [];
+        let brickArray = [];
+        let stoneArray = [];
+        let enemyArray = [];
+        let bulletArray = [];
+        let enemyBulletArray = [];
+        let meArray = [];
+        let enemyImg = ["enemy1.png", "enemy2.png", "enemy3.png"];
+        let pause;
+        let killCount=0; //적군 죽인 수
+        let win;
+        let gameOver;
+
+        //동시 key 막기 
+        let currentKey=0;
+
+        function createBrick() {
+            for (let a = 0; a < 26; a++) { //층수
+                for (let i = 0; i < 30; i++) { //호수
+                    //container, src, width, height, x, y, velX, velY
+                    
+                    //stage에 대한 정보가 들어있는 json을 꺼낸다
+                    let json=mapArray[level];
+
+                    if (json.map[a][i] == 1) {
+                        let brick = new Brick(stage, "./images/brick.png", 30, 30, i * 30, a * 30, 0, 0);
+                        brickArray.push(brick);
+                    } else if (json.map[a][i] == 2) {
+                        let grass = new Grass(stage, "./images/grass.png", 30, 30, i * 30, a * 30, 0, 0);
+                        brickArray.push(grass);
+                    } else if (json.map[a][i] == 3) {
+                        let stone = new Stone(stage, "./images/stone.png", 30, 30, i * 30, a * 30, 0, 0);
+                        stoneArray.push(stone);
+                    } else if (json.map[a][i] == 4) {
+                        let brick2 = new Brick2(stage, "./images/brick0.png", 30, 10, i * 30, 260 + a * 10, 0, 0);
+                        brickArray.push(brick2);
+                    } else if (json.map[a][i] == 5) {
+                        let mario = new Mario(stage, "./images/mario.png", 60, 55, i * 30, a * 30, 0, 0);
+                        brickArray.push(mario);
+
+                    }
+                }
+            }
+        }
+
+        function bullet() {
+            let velX = 0;
+            let velY = 0;
+
+            if (direct == 37) {
+                velX = -10;
+            } else if (direct == 38) {
+                velY = -10;
+            } else if (direct == 39) {
+                velX = 10;
+            } else if (direct == 40) {
+                velY = 10;
+            }
+
+            //container, src, width, height, x, y, velX, velY
+            let bullet = new Bullet(stage, "./images/bullet.png", 8, 8, me.x + (me.width / 2), me.y + (me.height / 2), velX, velY);
+            bulletArray.push(bullet);
+        }
+
+        /*-------------------------------------------------------------
+        적군의 수를 표현하는 이미지 생성 및 배열에 담기 
+        1) 각 레벨별로 할당된 enemyCount 수 만큼만 생성해야 한다
+        -------------------------------------------------------------*/
+        function createEnemyHp(){
+            for (let a = 0; a < 2; a++) {
+                for (let i = 0; i < (mapArray[level].enemycount/2); i++) {
+                    let img = document.createElement("img");
+                    img.src = "./images/hp.png";
+                    img.style.width = 30 + "px";
+                    img.style.height = 30 + "px";
+
+                    img.style.position = "absolute"
+                    img.style.left = 35 + a * 30 + "px";
+                    img.style.top = 20 + i * 32 + "px";
+
+                    enemyHp.appendChild(img);
+                    hpArray.push(img);
+                }
+            }
+        }
+
+        /*function createMeHp(){
+
+        }*/
+
+        /*-------------------------------------------------------------
+        적군이 죽을때 적군 수 상태정보에서 폭탄 이미지 제거하기
+        1) enemyArray의 수가 감소하면 그 수와 비례하여 이미지를 제거한다
+        -------------------------------------------------------------*/
+        function removeEnemyHp(){
+            //화면에서 제거 
+            enemyHp.removeChild(hpArray[killCount-1]);
+        }
+
+        function setInfo() {
+            //hpBox.innerText = "【" + score + "】";
+        }
+
+        function setScore() {
+            score -= 1;
+            //hpBox.innerText = score;
+        }
+
+        
+        /*-------------------------------------------------------------
+        아래의 적군 자동 생성 함수의 기능 
+        1) 일정한 시간 간격으로 적군 생성해준다 
+        2) level 마다 지정된 적군수만큼만 생성되도록 제한
+        -------------------------------------------------------------*/
+        function enemyCreateInterval() {
+            let r = getRandomByRange(3, 6);
+            setTimeout("enemyCreateInterval()", r * 1000);
+
+            if(flag && enemyCreateCount > 0){ // pause 기능 때문에
+                createEnemy();
+                enemyCreateCount--;
+            }
+        }
+
+
+        function createEnemy() {
+            let r = getRandom(enemyImg.length);
+            let enemy = new Enemy(stage, "./images/" + enemyImg[r], 50, 60, 0, 0, 0, 0);
+            enemyArray.push(enemy);
+        }
+
+        function createMe() {
+            //constructor(container, src, width, height, x, y, velX, velY) 
+
+            me = new Me(stage, "./images/me.png", 50, 60, 400, 620, 0, 0);
+            meArray.push(me);
+        }
+
+        function moveX(n) {
+            if(flag){ //pause 기능 때문에
+
+                //좌우 키가 우선 순위를 가질때만 코드 동작
+                if(currentKey==37 || currentKey==39){
+                    me.velX = n;
+                    if (n > 0) {
+                        me.img.style.transform = "rotate(90deg)";
+                    } else {
+                        me.img.style.transform = "rotate(270deg)";
+                    }
+                }
+            }
+        }
+
+        function moveY(n) {
+            if(flag){
+                if(currentKey==38 || currentKey==40){
+                    me.velY = n;
+                    if (n > 0) {
+                        me.img.style.transform = "rotate(180deg)";
+                    } else {
+                        me.img.style.transform = "rotate(0deg)";
+                    }
+                }
+            }
+        }
+
+        function stop() {
+            me.velX = 0;
+            me.velY = 0;
+        }
+
+        function createPauseText(){
+            pause = new Pause(stage, 900, 780, 0, 0);
+        }
+
+        function createWinText(){
+            if(enemyArray.length<=0){
+                win.classList.remove("hidden");
+            }
+        }
+
+
+        function loop() {
+            if(flag){// pause 기능 때문에
+                me.tick();
+                me.render();
+                
+                for(let i = 0; i < meArray.length; i++){
+                    meArray[i].tick();
+                    meArray[i].render();
+                }
+
+                for (let i = 0; i < enemyArray.length; i++) {
+                    enemyArray[i].tick();
+                    enemyArray[i].render();
+                }
+
+                //주인공의 총알 날리는 효과
+                for (let i = 0; i < bulletArray.length; i++) {
+                    bulletArray[i].tick();
+                    bulletArray[i].render();
+                }
+
+                //적군의 총알 날리는 효과
+                for (let i = 0; i < enemyBulletArray.length; i++) {
+                    enemyBulletArray[i].tick();
+                    enemyBulletArray[i].render();
+                }
+
+                for (let i = 0; i < stoneArray.length; i++) {
+                    stoneArray[i].tick();
+                    stoneArray[i].render();
+                }
+            }
+        }
+
+        function init() {
+            stage = document.getElementById("stage");
+            enemyHp = document.getElementById("enemyHp");        
+            hpBox = document.getElementById("hpBox");
+            win = document.getElementById("win");
+            gameOver = document.getElementById("gameOver");
+
+            createBrick();
+            createMe();
+        }
+
+        addEventListener("load", function () {
+            init();
+            enemyCreateInterval();
+            createEnemyHp();
+            //setInfo();
+            createPauseText(); //Pause 텍스트 생성
+            //createWinText(); //Win 텍스트 생성
+
+            setInterval("loop()", 20);
+
+            addEventListener("keydown", function (e) {
+                currentKey=e.keyCode;
+                setInfo.innerText=currentKey;
+
+                switch (e.keyCode) {
+                    //ESC를 누르고 나서 게임을 다시 시작할 경우 PAUSE 텍스트는 화면에서 사라져야 함
+                    case 27: flag = !flag; pause.div.style.display="none";break;
+                    case 32: bullet(); break;
+                    case 37: moveX(-2); direct = 37; break;
+                    case 39: moveX(2); direct = 39; break;
+                    case 38: moveY(-2); direct = 38; break;
+                    case 40: moveY(2); direct = 40; break;
+                }
+            });
+
+            addEventListener("keyup", function (e) {
+                currentKey=0;
+                setInfo.innerText=currentKey;
+
+                switch (e.keyCode) {
+                    case 37: stop(0); break;
+                    case 39: stop(0); break;
+                    case 38: stop(0); break;
+                    case 40: stop(0); break;
+                }
+            });
+        });
+
+    </script>
+</head>
+
+<body>
+    <div id="wrapper">
+        <div id="stage"></div>
+        
+        <div id="enemyHp"></div>
+        <div id="win" class="hidden" style="color: white;">YOU WIN</div>
+        <div id="gameOver" class="hidden" style="color: red;">GAME OVER</div>
+    </div>
+</body>
+
+</html>
